@@ -1,0 +1,51 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+# Defaults for VMs
+# Range 192.168.0.170-175
+# Used for lxd containers on linux
+
+#### Change these on each host machine.
+# Set name: prefix and number ex: k8s-01
+$instance_name_prefix ||= "k8s"
+$instance_number ||= "1"
+$my_ip ||= "192.168.0.170"
+#####
+#
+$vm_gui ||= false
+$vm_memory ||= 2048
+$vm_cpus ||= 1
+$shared_folders ||= {}
+$forwarded_ports ||= {}
+$subnet ||= "172.18.8"
+$box ||= "generic/ubuntu1804"
+$user_name ||= "vagrant"
+
+
+
+Vagrant.configure("2") do |config|
+    config.vm.box = $box
+    config.ssh.username = $user_name
+    config.vm.provider "virtualbox" do |vb|
+        vb.memory = $vm_memory
+        vb.cpus = $vm_cpus
+        vb.gui = $vm_gui
+        # vb.linked_clone = true
+        vb.customize ["modifyvm", :id, "--vram", "8"] # ubuntu defaults to 256 MB which is a waste of precious RAM
+    end
+    # always use Vagrants insecure key
+    config.ssh.insert_key = false
+    config.vm.network "public_network", ip: $my_ip
+    # default router
+    config.vm.provision "shell",
+    run: "always",
+    inline: "route add default gw 192.168.0.1"
+    # Per Node
+    config.vm.define vm_name = "%s-%01d" % [$instance_name_prefix, $instance_number]
+
+    # ssh_pub_key = File.readlines("#{Dir.home}/.ssh/k8s_key.pub").first.strip
+    ssh_pub_key = File.readlines("k8s_key.pub").first.strip
+    config.vm.provision 'shell', inline: 'mkdir -p /root/.ssh'
+    config.vm.provision 'shell', inline: "echo #{ssh_pub_key} >> /root/.ssh/authorized_keys"
+    config.vm.provision 'shell', inline: "echo #{ssh_pub_key} >> /home/vagrant/.ssh/authorized_keys", privileged: false
+
+end
